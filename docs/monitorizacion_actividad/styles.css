@@ -1,0 +1,101 @@
+/* css styles */
+.scroll-output {
+  overflow-y: scroll !important;
+  max-height: 700px !important;
+}
+
+/* Estilos generales para la barra de desplazamiento */
+::-webkit-scrollbar {
+  width: 10px; /* Ancho de la barra */
+  height: 10px; /* Alto de la barra (para scroll horizontal) */
+}
+
+/* Para navegadores basados en WebKit (Chrome, Safari) */
+::-webkit-scrollbar-track {
+  background: #f1f1f1; /* Color de fondo de la pista */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888; /* Color del pulgar */
+  border-radius: 5px; /* Bordes redondeados */
+}
+
+/* Estilos al pasar el cursor sobre el pulgar */
+::-webkit-scrollbar-thumb:hover {
+  background: #555; /* Color del pulgar al pasar el cursor */
+}
+
+/* Para Firefox */
+* {
+  scrollbar-width: thin; /* Ancho de la barra */
+  scrollbar-color: auto #f1f1f1; /* Color del pulgar y la pista */
+}
+
+
+.nav-tabs > li.active > a{border-bottom: none !important;}
+
+
+.green-circle {
+  width: 15px;
+  height: 15px;
+  background-color: green;
+  border-radius: 50%;
+}
+
+.yellow-circle {
+  width: 15px;
+  height: 15px;
+  background-color: #edc534;
+  border-radius: 50%;
+}
+
+.red-circle {
+  width: 15px;
+  height: 15px;
+  background-color: #b22222;
+  border-radius: 50%;
+}
+
+.white-circle {
+  width: 15px;
+  height: 15px;
+  background-color: #D3D3D3;
+  border-radius: 50%;
+}
+
+
+.q1-square {
+  width: 15px;
+  height: 15px;
+  background-color: #E0E0E0;
+  border-radius: 0%;
+}
+
+.q2-square {
+  width: 15px;
+  height: 15px;
+  background-color: #CCCCCC;
+  border-radius: 0%;
+}
+
+.q3-square {
+  width: 15px;
+  height: 15px;
+  background-color: #AAAAAA;
+  border-radius: 0%;
+}
+
+.q4-square {
+  width: 15px;
+  height: 15px;
+  background-color: #888888;
+  border-radius: 0%;
+}
+
+.q5-square {
+  width: 15px;
+  height: 15px;
+  background-color: #444444;
+  border-radius: 0%;
+}
+
