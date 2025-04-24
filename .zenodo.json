@@ -1,0 +1,39 @@
+{
+    "title": "Calculadora escenarios - Listas de Espera Quirúrgica (SNS)",
+    "description": "Esta es una herramienta de simulación de escenarios de lista de espera quirúrgica en procesos electivos incluidos en los decretos de garantías de tiempos de espera",
+    "creators": [
+        {
+            "name": "Bernal-Delgado, Enrique (Investigador Principal)",
+            "affiliation": "Instituto Aragonés de Ciencias de la Salud (IACS)",
+            "orcid": "0000-0002-0961-3298"
+        },
+        {
+            "name": " Ridao-López, Manuel",
+            "affiliation": "Instituto Aragonés de Ciencias de la Salud (IACS)",
+            "id": "0000-0001-7837-5759"
+        },
+        {
+            "name": "Estupiñán-Romero, Francisco",
+            "affiliation": "Instituto Aragonés de Ciencias de la Salud (IACS)",
+            "orcid": "0000-0002-6285-8120"
+        },
+        {
+            "name": "Royo-Sierra, Santiago",
+            "affiliation": "Instituto Aragonés de Ciencias de la Salud (IACS)",
+            "orcid": "0000-0002-0048-4370"
+        },
+        {
+            "name": "González-Galindo, Javier",
+            "affiliation": "Instituto Aragonés de Ciencias de la Salud (IACS)",
+            "orcid": "0000-0002-8783-5478"
+        }
+    ],
+    "keywords": [
+        "surgical procedures",
+        "waiting lists",
+        "queuing theory",
+        "learning health system",
+        "process assessment",
+        "health policy" 
+    ]
+}
