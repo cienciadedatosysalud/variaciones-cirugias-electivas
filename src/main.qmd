@@ -1,0 +1,606 @@
+---
+title: "Calculadora escenarios - Listas de Espera Quirúrgica (SNS)"
+lang: es
+date: "2025-03-27"
+date-modified: "`r Sys.Date()`"
+author:
+  - name:  "[Ciencia de datos para la Investigación en Servicios y Políticas de Salud](https://cienciadedatosysalud.org/)"
+    affiliations:
+      - name: Instituto Aragonés de Ciencias de la Salud (IACS)
+engine: knitr
+format: 
+  live-html:
+    embed-resources: true
+    highlight-style: pygments
+    code-fold: true
+    html-math-method: katex
+    grid:
+      body-width: 1700px
+webr:
+  packages:
+    - dplyr
+    - ggplot2
+    - DT 
+    - tidyr
+resources:
+  - data
+
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+
+
+
+:::{.callout-tip collapse = "true"}
+## Instrucciones de uso 
+
+Esta es una herramienta de simulación de escenarios de lista de espera quirúrgica en procesos electivos incluidos en los decretos de garantías de tiempos de espera. 
+El objetivo de esta herramienta es facilitar la configuración de escenarios a partir de la modificación de parámetros relevantes de la **demanda** (*i.e., porcentaje indicación inadecuada, porcentaje de salidas de lista de espera por motivos distintos a intervención*), de la **garantía** de tiempo de espera (*i.e., garantía y porcentaje de incumplimiento permitido de la garantía*), y de la **oferta** (*i.e., periodo de tiempo de aplicación de medidas extraordinarias hasta el retorno al equilibrio*).  
+
+Estos parámetros pueden ser configurados de forma independiente para cada proceso. 
+La herramienta sólo permite simular un escenario por proceso en cada ocasión.
+
+- **Proceso:** Proceso quirúrgico electivo con garantía de tiempo de espera. 
+
+- **% Indicación inadecuada:** Porcentaje de pacientes que se encuentran en lista de espera con una indicación quirúrgica inadecuada. Porcentaje de pacientes que no deberían estar en lista de espera quirúrgica dado que previsiblemente no van a beneficiarse de la intervención dada su situación.
+
+- **% Salidas LEQ no quirúrgicas:** Porcentaje de pacientes que abandonan la lista de espera por otros motivos distintos de intervención (*i.e., muerte, desplazamiento a otra región, rechazo de la intervención, etc.*) 
+
+- **% Prob. incumplimiento garantía:** Umbral de pacientes que pueden superar la garantía de tiempo de espera establecida. Este umbral puede expresarse como una probabilidad en función del área bajo la curva de la densidad de probabilidad de un tiempo de espera o como porcentaje de pacientes por encima de un determinado tiempo de espera - por encima de la garantía establecida. 
+
+- **Garantía (días):** Tiempo de espera máximo para un determinado proceso. 
+
+- **Tiempo hasta equilibrio (días):** Tiempo en el que se espera recuperar el equilibrio de la lista de espera (*i.e., prórroga o plazo hasta cumplimiento de la garantía para el proceso*).
+
+
+
+:::
+
+
+<style>
+
+
+/* Oculta los botones de subir y bajar */
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type=number] {
+    -moz-appearance: textfield; /* Para Firefox */
+  }
+
+  form.oi-3a86ea {
+      flex-wrap: nowrap;
+      width: 80%;
+      max-width: 100%;
+      margin: initial;
+  }
+
+.oi-3a86ea label {
+  --label-width: 62%;
+}
+
+.oi-3a86ea-input {
+    width: 120%!important;
+}
+
+div.dt-buttons>.dt-button:first-child, div.dt-buttons>div.dt-button-split .dt-button:first-child {
+    margin-left: 0;
+    margin-top: 15px;
+}
+
+
+</style>
+
+## Cuadro de Mandos
+
+:::: {.columns}
+
+::: {.column width="33%"}
+
+```{ojs} 
+//| echo: false
+viewof proceso_selected = Inputs.select(
+  [ "cataratas","hernia_inguinal_femoral","protesis_cadera","artroscopias","varices","colecistectomia","hallux_valgus","amigdalectomia_adenoidectomia",
+"prostatectomias","quiste_pilonidal","tunel_carpiano","protesis_rodilla","cirugia_valvular","by_pass_coronario","histerectomia"],
+  { label: 'Proceso:',
+    format: x => {
+      switch (x) {
+        case 'histerectomia':
+          return 'Histerectomía';
+        case 'cirugia_valvular':
+          return 'Cirugía valvular';
+        case 'colecistectomia':
+          return 'Colecistectomía';
+        case 'quiste_pilonidal':
+          return 'Quiste pilonidal';
+        case 'tunel_carpiano':
+          return 'Túnel carpiano';
+        case 'amigdalectomia_adenoidectomia':
+          return 'Amigdalectomía/Adenoidectomía';
+        case 'varices':
+          return 'Varices MM. II.';
+        case 'hernia_inguinal_femoral':
+          return 'Hernia inguinal/femoral';
+        case 'artroscopias':
+          return 'Artroscopia';
+        case 'prostatectomias':
+          return 'Prostatectomía';
+        case 'protesis_rodilla':
+          return 'Prótesis rodilla';
+        case 'hallux_valgus':
+          return 'Hallux valgus';
+        case 'protesis_cadera':
+          return 'Prótesis cadera';
+        case 'cataratas':
+          return 'Cataratas';
+        case 'by_pass_coronario':
+          return 'Bypass coronario';
+        default:
+          return x; // Para valores no definidos
+      }
+    }}
+);
+```
+:::
+
+::: {.column width="33%"}
+```{ojs}
+//| echo: false
+viewof perc_no_correct_indicados_ = Inputs.number({min:0, max: 100, value:30, step: 0.1 ,label: "% Indicación inadecuada:"})
+perc_no_correct_indicados = perc_no_correct_indicados_/100
+
+```
+::: 
+
+::: {.column width="33%"}
+```{ojs}
+//| echo: false
+viewof perc_no_operados_ = Inputs.number({min:0, max: 100, value:10, step: 0.1, label: "% Salidas LEQ no quirúrgicas:"})
+perc_no_operados = perc_no_operados_/100
+```
+:::
+
+:::: 
+
+:::: {.columns}
+
+::: {.column width="33%"}
+
+```{ojs} 
+//| echo: false
+viewof prob1_ = Inputs.number({min:0, max: 36, value:5,step: 0.1, label: "% Prob. incumplimiento garantía:"})
+prob1 = prob1_/100
+
+```
+:::
+
+::: {.column width="33%"}
+```{ojs}
+//| echo: false
+viewof target_wait = Inputs.number({min:15, max: 365, value:180, step: 1, label: "Garantía (días):"})
+```
+::: 
+
+::: {.column width="33%"}
+```{ojs}
+//| echo: false
+viewof target_date = Inputs.number({min:15, max: 365,value:180, step: 1, label: "Tiempo hasta equilibrio (días):"})
+```
+:::
+
+:::: 
+
+<hr>
+
+# Escenario Lista de Espera Quirúrgica
+
+::: columns
+::: column
+
+```{webr}
+#| echo: false
+#| warning: false
+#| autorun: true
+#| input:
+#|   - perc_no_operados
+#|   - perc_no_correct_indicados
+#|   - target_date
+#|   - target_wait
+#|   - proceso_selected
+#|   - prob1
+
+
+# library(ggplot2)
+# library(dplyr)
+# library(Hmisc)
+# library(DT)
+# library(tidyr)
+
+
+if(prob1 >0.36){
+  prob2_ <- 0.36
+  stop("El parámetro '% Prob. incumplimiento garantía' no admite valores superiores al 36%\nEl valor va a ser modificado a 36%")
+  
+}else{
+  prob2_ <- prob1
+}
+
+
+valor_medio <- target_wait/-log(prob2_)
+lambda <- 1 / valor_medio 
+
+tiempo <- seq(0, target_wait + target_wait/3, by = 1) 
+probabilidad <- exp(-lambda * tiempo) 
+
+# Crear un data frame con los datos
+datos <- data.frame(Tiempo = tiempo, Probabilidad = probabilidad)
+
+
+tiempo_p05 <- (-log(prob2_) / lambda)
+tiempo_p05_text <- (-log(prob2_) / lambda) - target_wait/3
+datos_sombreado <- subset(data.frame(Tiempo = tiempo, Probabilidad = probabilidad), Tiempo >= tiempo_p05)
+
+
+ggplot(datos, aes(x = Tiempo, y = Probabilidad)) +
+  geom_line(color = "black", size = 0.3) + # Línea de la curva
+ # geom_vline(xintercept = tiempo_p05, color = "red", linetype = "dashed", size = 1) +
+  # annotate("text", x = tiempo_p05, y = 0.5, label = expression(P(x > 3*bar(x))==0.05), color = "red", angle = 0, hjust = -0.1) + 
+  geom_vline(xintercept = valor_medio, color = "#006164", linetype = "dashed", size = 1) + 
+  annotate("text", x = valor_medio, y = 0.7, label = paste0("Media = ",round(valor_medio,0)," días"), color = "#006164", angle = 0, hjust = -0.1) +
+  annotate("text", x = tiempo_p05_text, y = 0.3, label = paste0("P (tiempo > ",target_wait,") = ",100*prob2_,"%"), color = "black", angle = 0, hjust = -0.1) + 
+    geom_area(data = datos_sombreado, aes(x = Tiempo, y = Probabilidad), fill = "#B3589A", alpha = 0.5) + # Área sombreada
+  labs(title = paste0("Curva de decaimiento exponencial (Valor medio = ",round(valor_medio,0)," días)"),
+       x = "Tiempo (días)",
+       y = "Probabilidad") +
+  scale_x_continuous(breaks = seq(0, target_wait + target_wait/3, by = 20)) + 
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) + 
+  theme_minimal()
+
+
+
+```
+:::
+::: column
+
+```{webr}
+#| echo: false
+#| warning: false
+#| autorun: true
+#| input:
+#|   - perc_no_operados
+#|   - perc_no_correct_indicados
+#|   - target_date
+#|   - target_wait
+#|   - proceso_selected
+#|   - prob1
+
+
+options(scipen = 999)
+
+if(prob1 >0.36){
+  prob2_ <- 0.36
+}else{
+  prob2_ <- prob1
+}
+
+
+if(is.na(perc_no_operados)){
+  perc_no_operados <- 0.1
+}
+
+if(is.na(perc_no_correct_indicados)){
+  perc_no_correct_indicados <- 0.3
+}
+
+if(is.na(target_date)){
+  target_date <- 180
+}
+
+if(is.na(target_wait)){
+  target_wait <- 180
+}
+
+
+listas_2023 <- read.csv("data/listas_espera_2023_tablas.csv", 
+                          sep = "|",colClasses = c('ccaa_cd' = 'character')) %>% filter(mes_año == '2023-12-31 00:00:00.000')
+
+listas_2023$proceso[listas_2023$proceso == 'hernia'] <- 'hernia_inguinal_femoral'
+listas_2023$proceso[listas_2023$proceso == 'artroscopia'] <- 'artroscopias'
+
+
+df_metricas <- read.csv('data/metricas_listas_esperas.csv',sep='|', colClasses = c('ccaa' = 'character') )
+
+
+calculate_average_queue_size <- function(proceso_,ccaa_cd_,perc_no_operados,perc_no_correct_indicados){
+  existe_data <- listas_2023  %>% 
+    filter(ccaa_cd == ccaa_cd_, proceso == proceso_) %>% nrow()
+  
+  if(existe_data == 0){
+    df <- data.frame(ccaa=ccaa_cd_,proceso=proceso_,tiempo_medio=NA,ratio=NA, relief_capacity=NA, target_capacity=NA)
+    return(df)
+  }
+  
+  queue_size = listas_2023 %>%
+    filter(ccaa_cd == ccaa_cd_, proceso == proceso_) %>%
+    pull(n_pac_leq_estructural)
+  queue_size = queue_size - (queue_size*perc_no_operados) - (queue_size*perc_no_correct_indicados)
+  
+  te_1000hab = listas_2023 %>%
+    filter(ccaa_cd == ccaa_cd_, proceso == proceso_) %>%
+    pull(te_1000hab)
+  
+  tiempo_medio = listas_2023 %>%
+    filter(ccaa_cd == ccaa_cd_, proceso == proceso_) %>%
+    pull(tiempo_medio)
+
+  metricas <- df_metricas %>% filter(indicador==proceso_, ccaa==ccaa_cd_)
+  existe_data <- metricas %>% nrow()
+  
+  if(existe_data == 0){
+    df <- data.frame(ccaa=ccaa_cd_,proceso=proceso_,tiempo_medio=NA, ratio=NA, relief_capacity=NA, target_capacity=NA)
+    return(df)
+  }
+  
+  # dias_con_cirugia_q <- metricas$n_dias_cirugia
+  
+  # capacidad_q <- paste0("select count(*) as n from main.",nombre_tabla," where ccaa='",ccaa_cd_,"' and ",proceso_," and publico_bl")
+  
+  # dias_con_cirugia <-  dbGetQuery(con,dias_con_cirugia_q)
+  dias_con_cirugia <- metricas$n_dias_cirugia
+  
+  # varianza_q <- paste0("select var_samp(n) from (select coalesce(fecinicont,fecinghosp,fecint) as fecha, count(*) as n from main.",nombre_tabla," where ccaa='",ccaa_cd_,"' and ",proceso_," and publico_bl group by coalesce(fecinicont,fecinghosp,fecint))")
+  
+  capacidad <- metricas$capacidad
+  capacidad <- capacidad / dias_con_cirugia
+  varianza <-  metricas$varianza
+  # varianza <- varianza/dias_con_cirugia
+  demand = queue_size / dias_con_cirugia 
+  if(demand <1){
+    demand <- 1
+  }
+  
+  if(proceso_=='tpiq05'){
+    proceso_ <- 'by_pass_coronario'
+    
+  }
+  
+  avg_waiting_time = listas_2023 %>%
+    filter(ccaa_cd == ccaa_cd_, proceso == proceso_) %>%
+    pull(tiempo_medio)
+
+  average_queue_size <- demand * avg_waiting_time
+  
+  
+  # target_wait <- 180
+  # target_date <- 180
+  
+  target_queue_size <- (target_wait/-log(prob1)) * demand
+  
+  ratio <- queue_size / target_queue_size
+  
+  relief_capacity <- demand + (queue_size - target_queue_size) / target_date
+  
+  
+  # poblacion_2023 <- ine_data %>%  filter(str_starts(`Comunidades.y.Ciudades.Autónomas`, ccaa_cd_))
+  # 
+  # poblacion_2023 <- as.numeric(gsub("\\.", "",poblacion_2023$Total))
+  
+  
+  f <- (varianza/capacidad)*((demand/capacidad)^2)
+  
+  target_capacity <- demand + ((2*(1+4*f))/target_wait)
+  
+  
+  df <- data.frame(ccaa=ccaa_cd_,proceso=proceso_,tiempo_medio=tiempo_medio,ratio=round(ratio,2), relief_capacity=round(relief_capacity,2), target_capacity=round(target_capacity,2))
+
+  return(df)
+}
+
+# list_procesos <- c("histerectomia","cirugia_valvular","colecistectomia","quiste_pilonidal",
+#                    "tunel_carpiano","amigdalectomia_adenoidectomia",
+#                    "varices","hernia_inguinal_femoral","artroscopias",  "prostatectomias","protesis_rodilla",
+#                    "hallux_valgus","protesis_cadera", "cataratas","by_pass_coronario")  
+
+
+list_procesos <- c(proceso_selected)
+
+proceso_label <- switch(proceso_selected,
+         "histerectomia" = "Histerectomía",
+         "cirugia_valvular" = "Cirugía valvular",
+         "colecistectomia" = "Colecistectomía",
+         "quiste_pilonidal" = "Quiste pilonidal",
+         "tunel_carpiano" = "Túnel carpiano",
+         "amigdalectomia_adenoidectomia" = "Amigdalectomía/Adenoidectomía",
+         "varices" = "Varices MM. II.",
+         "hernia_inguinal_femoral" = "Hernia inguinal/femoral",
+         "artroscopias" = "Artroscopia",
+         "prostatectomias" = "Prostatectomía",
+         "protesis_rodilla" = "Prótesis rodilla",
+         "hallux_valgus" = "Hallux valgus",
+         "protesis_cadera" = "Prótesis cadera",
+         "cataratas" = "Cataratas",
+         "by_pass_coronario" = "Bypass coronario",
+         x # Para valores no definidos
+  )
+
+
+list_ccaa <- listas_2023 %>% filter(as.numeric(ccaa_cd) <=17 ) %>%  select(ccaa_cd) %>% unique() 
+
+list_ccaa <- list_ccaa$ccaa_cd
+
+df_end <- data.frame()
+
+
+for(ccaa_ in list_ccaa){
+  
+  df_ccaa <- lapply(list_procesos, calculate_average_queue_size,ccaa_cd_=ccaa_,perc_no_operados=perc_no_operados,perc_no_correct_indicados=perc_no_correct_indicados)
+  df_ccaa <- do.call(rbind,df_ccaa)
+  df_end <- rbind(df_end, df_ccaa)
+}
+
+datos_pivot <- df_end %>%
+  pivot_wider(
+    id_cols = ccaa,
+    names_from = proceso,
+    values_from = c(tiempo_medio,ratio, relief_capacity, target_capacity),
+     names_glue = "{proceso}_{.value}"
+  )
+
+df_ccaa<- data.frame(
+  stringsAsFactors = FALSE,
+  cod_ccaa = c("01","02","03","04","05",
+               "06","07","08","09","10","11",
+               "12","13","14","15","16","17",
+               "18"),
+  ccaa_iso2 = c("AN","AR","AS","IB","CN",
+                "CB","CL","CM","CT","VC","EX",
+                "GA","MD","MC","NC","PV","RI",
+                "IG"),
+  ccaa_nuts2 = c("ES61","ES24","ES12","ES53","ES70",
+                "ES13","ES41","ES42","ES51","ES52","ES43",
+                "ES11","ES30","ES62","ES22","ES21","ES23",
+                "ES63-ES64"),
+  comunidad_autonoma = c("Andalucía","Aragón",
+                         "Asturias",
+                         "Baleares","Canarias","Cantabria",
+                         "Castilla y León","Castilla-La Mancha",
+                         "Cataluña","Comunidad Valenciana",
+                         "Extremadura","Galicia",
+                         "Madrid","Murcia",
+                         "Navarra",
+                         "País Vasco","La Rioja","Ingesa"))
+
+datos_pivot <- left_join(datos_pivot,df_ccaa[c('cod_ccaa','comunidad_autonoma')],by=c('ccaa'='cod_ccaa'))
+
+# datos_pivot <- datos_pivot %>% dplyr::select(comunidad_autonoma,ccaa,starts_with(c("histerectomia","cirugia_valvular","colecistectomia","quiste_pilonidal","tunel_carpiano","amigdalectomia_adenoidectomia",
+#                    "varices","hernia_inguinal_femoral","artroscopias",  "prostatectomias","protesis_rodilla",
+#                    "hallux_valgus","protesis_cadera", "cataratas","by_pass_coronario")))
+
+datos_pivot <- datos_pivot %>% dplyr::select(comunidad_autonoma,ccaa,starts_with(c(proceso_selected)))
+
+datos_pivot <- datos_pivot[order(datos_pivot$ccaa),]
+datos_pivot <- datos_pivot %>% dplyr::select(!ccaa)
+
+
+datos_pivot_ <- datos_pivot %>% dplyr::select(comunidad_autonoma,starts_with(c(proceso_selected)))
+datos_pivot_[""] <- NA
+
+datos_pivot_["Proceso"] <- NA
+datos_pivot_["Proceso"][1,] <- proceso_label
+datos_pivot_["% Indicación inadecuada"]<- NA
+datos_pivot_["% Indicación inadecuada"][1,] <- perc_no_correct_indicados
+datos_pivot_["% Salidas LEQ no quirúrgicas"] <- NA
+datos_pivot_["% Salidas LEQ no quirúrgicas"][1,] <- perc_no_operados
+datos_pivot_["% Prob. incumplimiento garantía"] <- NA
+datos_pivot_["% Prob. incumplimiento garantía"][1,] <- prob1
+datos_pivot_["Garantía (días)"] <- NA
+datos_pivot_["Garantía (días)"][1,] <- target_wait
+datos_pivot_["Tiempo hasta equilibrio (días)"] <- NA
+datos_pivot_["Tiempo hasta equilibrio (días)"][1,] <- target_date
+
+datatable(
+  datos_pivot_,
+  extensions = 'Buttons',
+  container = htmltools::tags$table(
+    class = "display",
+    htmltools::tags$thead(
+#       htmltools::tags$tr(
+#         htmltools::tags$th(rowspan = 2, "CCAA"),
+# htmltools::tags$th(colspan = 3,proceso_label),
+#       ),
+      htmltools::tags$tr(
+        htmltools::tags$th(proceso_label),
+htmltools::tags$th("Demora media"),
+htmltools::tags$th("Distancia al equilibrio"),
+htmltools::tags$th("Capacidad de rescate"),
+htmltools::tags$th("Objetivo de capacidad"),
+htmltools::tags$th(""),
+htmltools::tags$th("Proceso"),
+htmltools::tags$th("% Indicación inadecuada"),
+htmltools::tags$th("% Salidas LEQ no quirúrgicas"),
+htmltools::tags$th("% Prob. incumplimiento garantía"),
+htmltools::tags$th("Garantía (días)"),
+htmltools::tags$th("Tiempo hasta equilibrio (días)")
+      )
+    )
+  ),
+   options = list(
+     columnDefs = list(
+      list(visible = FALSE, targets = c(5,6, 7,8,9,10,11)) 
+    ),
+    ordering = FALSE, # Desactivar el ordenamiento para mantener el orden deseado
+    dom = "tipB", # Mostrar solo la tabla, información y paginación
+  pageLength = 25,
+  paging = FALSE, 
+  info = FALSE,
+   buttons = c('excel')),
+  rownames = FALSE
+  
+) %>%
+  formatStyle(datos_pivot_ %>% dplyr::select(ends_with('_ratio')) %>% colnames(),
+  backgroundColor = styleInterval(c(1, 2), c('#BBD4A6', '#EDA247', '#B3589A')),
+  color = styleInterval(c(1, 2), c('black','white','white')))
+
+
+```
+
+
+:::
+
+:::
+
+:::{.callout-note collapse = "true"}
+## Interpretación 
+
+A continuación se muestra el resultado de la simulación de un escenario de listas de espera basado en los parámetros introducidos para el proceso seleccionado, los datos del informe por Comunidades Autónomas (CCAA) del Sistema de Información sobre Listas de Espera para **Diciembre 2023**, y los datos del Conjunto Mínimo Básico de Datos al Alta Hospitalaria (RAE-CMBD) de 2023.
+
+En estos escenarios se asume que la garantía y el umbral de tolerancia (*i.e., % incumplimiento de garantía*) son iguales para todas las CCAA. 
+
+Este escenario se compone de:
+
+- **Curva de decaimiento exponencial del tiempo en lista de espera quirúrgica**:
+
+Esta curva representa la distribución de tiempos de espera de todos los pacientes con indicación de intervención electiva, en función de la garantía del proceso y de la probabilidad de incumplimiento de esta garantía. 
+En esta curva se indica el tiempo medio en lista de espera a conseguir para asegurar la probabilidad de incumplimiento asociada a esta garantía. Es decir, en Histerectomía, para una garantía de espera menor a 180 días con una tolerancia del 5% de incumplimiento, se requiere que la media de espera en lista sea de no más de 60 días desde su indicación hasta intervención (*i.e., objetivo de tiempo medio de espera*). La zona sombreada en rojo corresponde a la probabilidad acumulada de esperas mayores al tiempo de garantía, equivalente al 5% de incumplimiento fijado. 
+
+- **Tabla de métricas de lista de espera quirúrgica**:
+
+En esta tabla se recogen para todas las CCAA la información sobre su 
+
+a) **Demora media**: Tiempo de espera desde indicación y entrada en lista de espera quirúrgica hasta intervención.
+
+b) **Distancia al equilibrio** de la lista de espera: Se interpreta como la distancia entre el tamaño de la lista de espera (número de pacientes) en relación al objetivo de tamaño de la lista de espera (número de pacientes que deberían estar en la lista de espera para que la demanda fuera similar a la capacidad de atender a esta demanda). Esta distancia puede interpretarse como la distancia entre la situación actual y una situación basal en la que la lista de espera no tiende a crecer exponencialmente.
+
+
+&nbsp;&nbsp;&nbsp;&nbsp;<b style="background-color: #BBD4A6;">Valores por debajo de 1</b> significa que reducen la lista de espera en el siguiente periodo.
+
+&nbsp;&nbsp;&nbsp;&nbsp;<b style="background-color: #EDA247;">Valores comprendidos entre 1 y 2</b> significa que no aumentan la lista de espera adoptando medidas organizativas.
+
+&nbsp;&nbsp;&nbsp;&nbsp;<b style="background-color: #B3589A; color: white;">Valores por encima de 2</b> significa que aumentan la lista de espera independientemente de la adopción de medidas organizativas. En estos casos se requieren medidas extraordinarias (*i.e., incremento de la capacidad, control de la demanda*). 
+
+c) **Capacidad de rescate**: Incremento de la capacidad (*i.e., número de intervenciones al día adicionales*) requerido para alcanzar el equilibrio de la lista de espera (*i.e., demanda ~ capacidad*) en el periodo de tiempo fijado (*i.e., tiempo hasta equilibrio (días)*). Se interpreta como el número de intervenciones quirúrgicas adicionales a las habitualmente realizadas durante cada día del periodo fijado a realizar para conseguir revertir la lista de espera a su estado de equilibrio. 
+
+d) **Objetivo de capacidad**: Incremento de la capacidad (*i.e., número de intervenciones al día adicionales*) requerido para mantener el equilibrio una vez este se haya alcanzado dada la situación de la demanda hasta ese momento. Este objetivo de capacidad se estima considerando los días de actividad y la varianza en la capacidad (*i.e., número de intervenciones al día*) del periodo anterior como factores fijos que se proyectan en el siguiente periodo. Este objetivo de capacidad es sólo una estimación relativa y puede ser sensible a la dinámica de variación de la actividad asistencial durante el periodo siguiente y a la capacidad del sistema (o servicio) de alcanzar el equilibrio en el tiempo fijado. 
+
+:::
+
+
+::: {.callout-note collapse = "true"}
+## Fuente de Datos
+
+Los datos presentados en este documento relativos a las listas de espera corresponden a la información proporcionada por el Ministerio de Sanidad con fecha de corte a **diciembre de 2023** (*extraída del SISLE*). Estos datos pueden consultarse en el siguiente enlace: <a href="https://www.sanidad.gob.es/estadEstudios/estadisticas/inforRecopilaciones/docs/Datos_ccaa_dic2023.pdf" target="_blank">Datos Listas de Espera - Diciembre 2023</a>.
+
+Para el análisis y la caracterización de los procesos, se han utilizado datos pseudonimizados del **Conjunto Mínimo Básico de Datos (CMBD)** correspondientes al año **2023**.
+
+**Limitaciones:** 
+
+- Estos escenarios consideran la información de la actividad hospitalaria del año 2023 para el cálculo de la capacidad y de la variación de la capacidad, proyectando esta información al siguiente periodo a efectos del cálculo de la capacidad de rescate y del objetivo de capacidad. La interpretación de los resultados de estos escenarios deberá considerar potenciales limitaciones derivadas de la disponibilidad o calidad de los datos originales.  
+
+- La estimación de la capacidad y de la variación de la capacidad se ha hecho considerando sólo la actividad financiada públicamente realizada en hospitales de titularidad (o dependencia) pública. Es decir, no se ha tenido en cuenta la actividad concertada o financiada públicamente pero realizada en centros de titularidad o dependencia privada. 
+
+
+:::
