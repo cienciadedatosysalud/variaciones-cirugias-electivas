@@ -320,7 +320,7 @@ calculate_average_queue_size <- function(proceso_,ccaa_cd_,perc_no_operados,perc
     filter(ccaa_cd == ccaa_cd_, proceso == proceso_) %>% nrow()
   
   if(existe_data == 0){
-    df <- data.frame(ccaa=ccaa_cd_,proceso=proceso_,tiempo_medio=NA,ratio=NA, relief_capacity=NA, target_capacity=NA)
+    df <- data.frame(ccaa=ccaa_cd_,proceso=proceso_,tiempo_medio=NA,ratio=NA, relief_capacity=NA, target_capacity=NA,waiting_list_pressure=NA)
     return(df)
   }
   
@@ -341,7 +341,7 @@ calculate_average_queue_size <- function(proceso_,ccaa_cd_,perc_no_operados,perc
   existe_data <- metricas %>% nrow()
   
   if(existe_data == 0){
-    df <- data.frame(ccaa=ccaa_cd_,proceso=proceso_,tiempo_medio=NA, ratio=NA, relief_capacity=NA, target_capacity=NA)
+    df <- data.frame(ccaa=ccaa_cd_,proceso=proceso_,tiempo_medio=NA, ratio=NA, relief_capacity=NA, target_capacity=NA,waiting_list_pressure=NA)
     return(df)
   }
   
@@ -394,8 +394,9 @@ calculate_average_queue_size <- function(proceso_,ccaa_cd_,perc_no_operados,perc
   
   target_capacity <- demand + ((2*(1+4*f))/target_wait)
   
+  waiting_list_pressure <- -log(prob2_)*(avg_waiting_time/target_wait)
   
-  df <- data.frame(ccaa=ccaa_cd_,proceso=proceso_,tiempo_medio=tiempo_medio,ratio=round(ratio,2), relief_capacity=round(relief_capacity,2), target_capacity=round(target_capacity,2))
+  df <- data.frame(ccaa=ccaa_cd_,proceso=proceso_,ratio=round(ratio,2), relief_capacity=round(relief_capacity,2), target_capacity=round(target_capacity,2),tiempo_medio=tiempo_medio,waiting_list_pressure=round(waiting_list_pressure,2))
 
   return(df)
 }
@@ -446,7 +447,7 @@ datos_pivot <- df_end %>%
   pivot_wider(
     id_cols = ccaa,
     names_from = proceso,
-    values_from = c(tiempo_medio,ratio, relief_capacity, target_capacity),
+    values_from = c(ratio, relief_capacity, target_capacity,tiempo_medio,waiting_list_pressure),
      names_glue = "{proceso}_{.value}"
   )
 
@@ -502,6 +503,7 @@ datos_pivot_["Garantía (días)"][1,] <- target_wait
 datos_pivot_["Tiempo hasta equilibrio (días)"] <- NA
 datos_pivot_["Tiempo hasta equilibrio (días)"][1,] <- target_date
 
+
 datatable(
   datos_pivot_,
   extensions = 'Buttons',
@@ -514,10 +516,11 @@ datatable(
 #       ),
       htmltools::tags$tr(
         htmltools::tags$th(proceso_label),
-htmltools::tags$th("Demora media"),
 htmltools::tags$th("Distancia al equilibrio"),
 htmltools::tags$th("Capacidad de rescate"),
 htmltools::tags$th("Objetivo de capacidad"),
+htmltools::tags$th("Demora media"),
+htmltools::tags$th("Presión de Espera"),
 htmltools::tags$th(""),
 htmltools::tags$th("Proceso"),
 htmltools::tags$th("% Indicación inadecuada"),
@@ -530,7 +533,7 @@ htmltools::tags$th("Tiempo hasta equilibrio (días)")
   ),
    options = list(
      columnDefs = list(
-      list(visible = FALSE, targets = c(5,6, 7,8,9,10,11)) 
+      list(visible = FALSE, targets = c(6,7, 8,9,10,11,12)) 
     ),
     ordering = FALSE, # Desactivar el ordenamiento para mantener el orden deseado
     dom = "tipB", # Mostrar solo la tabla, información y paginación
@@ -571,9 +574,7 @@ En esta curva se indica el tiempo medio en lista de espera a conseguir para aseg
 
 En esta tabla se recogen para todas las CCAA la información sobre su 
 
-a) **Demora media**: Tiempo de espera desde indicación y entrada en lista de espera quirúrgica hasta intervención.
-
-b) **Distancia al equilibrio** de la lista de espera: Se interpreta como la distancia entre el tamaño de la lista de espera (número de pacientes) en relación al objetivo de tamaño de la lista de espera (número de pacientes que deberían estar en la lista de espera para que la demanda fuera similar a la capacidad de atender a esta demanda). Esta distancia puede interpretarse como la distancia entre la situación actual y una situación basal en la que la lista de espera no tiende a crecer exponencialmente.
+a) **Distancia al equilibrio** de la lista de espera: Se interpreta como la distancia entre el tamaño de la lista de espera (número de pacientes) en relación al objetivo de tamaño de la lista de espera (número de pacientes que deberían estar en la lista de espera para que la demanda fuera similar a la capacidad de atender a esta demanda). Esta distancia puede interpretarse como la distancia entre la situación actual y una situación basal en la que la lista de espera no tiende a crecer exponencialmente.
 
 
 &nbsp;&nbsp;&nbsp;&nbsp;<b style="background-color: #BBD4A6;">Valores por debajo de 1</b> significa que reducen la lista de espera en el siguiente periodo.
@@ -582,9 +583,13 @@ b) **Distancia al equilibrio** de la lista de espera: Se interpreta como la dist
 
 &nbsp;&nbsp;&nbsp;&nbsp;<b style="background-color: #B3589A; color: white;">Valores por encima de 2</b> significa que aumentan la lista de espera independientemente de la adopción de medidas organizativas. En estos casos se requieren medidas extraordinarias (*i.e., incremento de la capacidad, control de la demanda*). 
 
-c) **Capacidad de rescate**: Incremento de la capacidad (*i.e., número de intervenciones al día adicionales*) requerido para alcanzar el equilibrio de la lista de espera (*i.e., demanda ~ capacidad*) en el periodo de tiempo fijado (*i.e., tiempo hasta equilibrio (días)*). Se interpreta como el número de intervenciones quirúrgicas adicionales a las habitualmente realizadas durante cada día del periodo fijado a realizar para conseguir revertir la lista de espera a su estado de equilibrio. 
+b) **Capacidad de rescate**: Incremento de la capacidad (*i.e., número de intervenciones al día adicionales*) requerido para alcanzar el equilibrio de la lista de espera (*i.e., demanda ~ capacidad*) en el periodo de tiempo fijado (*i.e., tiempo hasta equilibrio (días)*). Se interpreta como el número de intervenciones quirúrgicas adicionales a las habitualmente realizadas durante cada día del periodo fijado a realizar para conseguir revertir la lista de espera a su estado de equilibrio. 
 
-d) **Objetivo de capacidad**: Incremento de la capacidad (*i.e., número de intervenciones al día adicionales*) requerido para mantener el equilibrio una vez este se haya alcanzado dada la situación de la demanda hasta ese momento. Este objetivo de capacidad se estima considerando los días de actividad y la varianza en la capacidad (*i.e., número de intervenciones al día*) del periodo anterior como factores fijos que se proyectan en el siguiente periodo. Este objetivo de capacidad es sólo una estimación relativa y puede ser sensible a la dinámica de variación de la actividad asistencial durante el periodo siguiente y a la capacidad del sistema (o servicio) de alcanzar el equilibrio en el tiempo fijado. 
+c) **Objetivo de capacidad**: Incremento de la capacidad (*i.e., número de intervenciones al día adicionales*) requerido para mantener el equilibrio una vez este se haya alcanzado dada la situación de la demanda hasta ese momento. Este objetivo de capacidad se estima considerando los días de actividad y la varianza en la capacidad (*i.e., número de intervenciones al día*) del periodo anterior como factores fijos que se proyectan en el siguiente periodo. Este objetivo de capacidad es sólo una estimación relativa y puede ser sensible a la dinámica de variación de la actividad asistencial durante el periodo siguiente y a la capacidad del sistema (o servicio) de alcanzar el equilibrio en el tiempo fijado. 
+
+d) **Demora media**: Tiempo de espera desde indicación y entrada en lista de espera quirúrgica hasta intervención.
+
+e) **Presión de Espera**: Es una métrica que cuantifica la gravedad del retraso promedio (i.e., demora media) del sistema en relación con el objetivo de tiempo medio de espera para asegurar la probabilidad de incumplimiento asociada a la garantía establecida. Se calcula como la demora media experimentada por los usuarios en la lista dividido por el objetivo de tiempo medio de espera para esa lista. Se interpreta como qué tanto se desvía la lista de espera respecto a sus propios objetivos de tiempo. Cuanto mayor sea este valor, mayor es el grado en que el servicio está fallando en cumplir sus metas de espera. Esta métrica se puede utilizar para priorizar acciones entre procesos.
 
 :::
 
