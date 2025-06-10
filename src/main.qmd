@@ -378,7 +378,7 @@ calculate_average_queue_size <- function(proceso_,ccaa_cd_,perc_no_operados,perc
   # target_wait <- 180
   # target_date <- 180
   
-  target_queue_size <- (target_wait/-log(prob1)) * demand
+  target_queue_size <- (target_wait/-log(prob2_)) * demand
   
   ratio <- queue_size / target_queue_size
   
@@ -396,6 +396,8 @@ calculate_average_queue_size <- function(proceso_,ccaa_cd_,perc_no_operados,perc
   
   waiting_list_pressure <- -log(prob2_)*(avg_waiting_time/target_wait)
   
+  
+  #añadir waiting_list_pressure=round(waiting_list_pressure,2)
   df <- data.frame(ccaa=ccaa_cd_,proceso=proceso_,ratio=round(ratio,2), relief_capacity=round(relief_capacity,2), target_capacity=round(target_capacity,2),tiempo_medio=tiempo_medio,waiting_list_pressure=round(waiting_list_pressure,2))
 
   return(df)
@@ -497,7 +499,7 @@ datos_pivot_["% Indicación inadecuada"][1,] <- perc_no_correct_indicados
 datos_pivot_["% Salidas LEQ no quirúrgicas"] <- NA
 datos_pivot_["% Salidas LEQ no quirúrgicas"][1,] <- perc_no_operados
 datos_pivot_["% Prob. incumplimiento garantía"] <- NA
-datos_pivot_["% Prob. incumplimiento garantía"][1,] <- prob1
+datos_pivot_["% Prob. incumplimiento garantía"][1,] <- prob2_
 datos_pivot_["Garantía (días)"] <- NA
 datos_pivot_["Garantía (días)"][1,] <- target_wait
 datos_pivot_["Tiempo hasta equilibrio (días)"] <- NA
